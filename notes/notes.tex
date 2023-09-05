@@ -1,0 +1,928 @@
+\documentclass[a4paper, 12pt]{extarticle}
+
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+
+\usepackage{hyperref}
+\usepackage{multirow} 
+\usepackage{graphicx}
+\usepackage{bm}
+\usepackage{geometry}
+\usepackage{listings}
+\usepackage{tabularx}
+\usepackage{tikz}
+\usetikzlibrary{automata,positioning}
+
+\geometry{a4paper,top=1.5cm,bottom=1.5cm,bindingoffset=0cm}
+\geometry{left=3cm,textwidth=16cm}
+% \linespread{1.0}
+  
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{verbatim}
+
+\title{}
+\author{}
+\date{}
+
+\newtheorem*{definition}{Определение}
+\newtheorem*{homework}{Упражнение}
+
+\newcommand{\MTRule}[4]{#1 \rightarrow #2 #3 \ #4}
+\newcommand{\MTRuleTwo}[7]{#1 & #2 & \rightarrow & #3#4\ &\ #5#6 & #7}
+\newcommand{\AhoUlman}{[А.Ахо, Дж.Хопкрофт, Дж.Ульман. Построение и анализ вычислительных алгоритмов. М.: Мир, 1979]}
+
+
+\begin{document}
+
+\section*{Семинар \#1. Машина Тьюринга. Оценки сложности.}
+
+\begin{definition}
+ Алфавит $\Sigma$ -- конечное множество символов.
+\end{definition}
+
+\begin{definition}
+ Слово $w$ -- конечная последовательность символов.
+\end{definition}
+
+\begin{definition}
+ Язык $L$ -- множество слов в алфавите $\Sigma$.
+\end{definition}
+
+\begin{definition}
+ k-ленточная машина Тьюринга ($MT^{k}$) -- кортеж $\langle \Sigma, Q, q_0, Q_F, \pi\rangle$.
+ \begin{itemize}
+  \item $Q$ -- конечное множество состояний,
+  \item  $Q_F \subset Q$ -- множество заключительных состояний,
+  \item  $q_0 \in Q$ -- начальное состояние,
+  \item  $\pi : Q \times \Sigma^k \rightarrow Q \times (\Sigma \times (L, R, H))^k$ -- программа.
+ \end{itemize}
+\end{definition}
+
+\begin{definition}
+ Конфигурация МТ $\langle q, S, P\rangle$: 
+ \begin{itemize}
+  \item $q \in Q$  -- текущее состояние,
+  \item $S$ -- состояние ленты,
+  \item $P$ -- позиции головок.
+ \end{itemize}
+\end{definition}
+
+\begin{definition}
+ Протокол -- последовательность пройденных конфигураций.
+\end{definition}
+
+\begin{definition}
+ Словарная функция $\phi_M: \Sigma^* \rightarrow \Sigma^*$.
+\end{definition}
+
+\begin{definition}
+ Временная сложность в худшем случае: 
+ $$T_M(n) = max\{t_M(w) \ . \ \|w\| \leq n \land w \in D(\phi_M)\}$$
+\end{definition}
+
+\begin{definition}
+ Временная сложность в среднем:
+  $$T_M(n) = \sum_{\|w\| = n} t_M(w) p(n, w)$$
+  где, $p(n, w)$ -- вероятность появления $w$ среди всех входов длины $n$.
+\end{definition}
+
+\subsection*{Пример работы. Запись в табличном и графовом виде.}
+Задача: написать программу для одноленточной МТ в алфавите $\{0, 1, \#\}$, которая инвертирует двоичную строку. Например,
+входные данные $\#0011101010\#$ следует преобразовать в $\#1100010101\#$.
+
+Запись МТ в табличном виде:
+\begin{align*}
+START: &                            & INVERT:&                         \\
+       & \MTRule{\#}{\#}{R}{INVERT} &       & \MTRule{\#}{\#}{H}{STOP} \\
+       & \MTRule{0}{\#}{H}{ERROR}   &       & \MTRule{0}{1}{R}{INVERT} \\
+       & \MTRule{1}{\#}{H}{ERROR}   &       & \MTRule{1}{0}{R}{INVERT} 
+\end{align*}
+
+\begin{figure}[h!]
+\begin{center}
+\begin{tikzpicture}[shorten >=1pt,node distance=5cm,on grid,auto] 
+   \node[state] (START)   {$START$}; 
+   \node[state] (INVERT) [right=of START] {$INVERT$}; 
+   \node[state, accepting] (STOP) [right=of INVERT] {$STOP$}; 
+   \node[state](ERROR) [below=of START] {$ERROR$};
+    \path[->] 
+    (START) edge  node {$\# \rightarrow \#R$} (INVERT)
+            edge  node {$\{0, 1\} \rightarrow \#H$} (ERROR)
+    (INVERT) edge  node  {$\# \rightarrow \#H$} (STOP)
+             edge [loop above] node {$0 \rightarrow 1R$} (INVERT)
+             edge [loop below] node {$1 \rightarrow 0R$} (INVERT);
+\end{tikzpicture}
+\end{center}
+\caption{Запись МТ в графовом виде}
+\end{figure}
+
+
+\subsection*{Инкремент}
+Задача: написать программу для одноленточной МТ в алфавите $\{0, 1, \#\}$, которая к двоичному числу, записанному ``слева направо'' 
+(т.е. наименее значимый бит -- Least Significant Bit, LSB -- слева) без лидирующих нулей, прибавляет единицу. Примеры:
+$$\#1\# \Rightarrow \#01\#$$
+$$\#001\# \Rightarrow \#101\#$$
+$$\#1001\# \Rightarrow \#0101\#$$
+
+Оценить сложность в худшем. Оценить сложность в среднем.
+
+\subsubsection*{Подсказки}
+Разбить множество всех входов фиксированной длины $I_n$ на классы $I^{0}_n, I^{1}_n, ..., I^{n}_n$, где
+$$I^{i}_n = \{ w \in I. \ w = \# \underbrace{\underbrace{1...1}_{\text{$i$ единиц}}0\underbrace{*...*}_{\text{произвольные символы}}}_{\text{всего $n$ цифр}}\#\}$$
+
+Найти $T_i(w)$ для $w \in I^{i}_n$. Вычислить $\vert{I^{i}_n}\rvert$. 
+
+$$S_1(t) = t + t^2 + ... + t^n \Rightarrow tS_1(t) - S_1(t) = t^{n+1} - t \Rightarrow ...$$
+$$S_2(t) = t + 2t^2 + ... + nt^n \Rightarrow tS_2(t) - S_2(t) = ...$$
+
+\begin{homework}
+ Написать программу для одноленточной МТ в алфавите $\{0, 1, \#\}$, которая разворачивает данную строку, состоящую из нулей и единиц.
+ Примеры:
+$$\#1\# \Rightarrow \#1\#$$
+$$\#001\# \Rightarrow \#100\#$$
+$$\#1101\# \Rightarrow \#1011\#$$
+\end{homework}
+
+\begin{homework}
+ Написать программу для одноленточной МТ в алфавите $\{0, 1, \#\}$, которая проверяет, является ли заданная строка
+ правильной записью двоичного числа (LSB -- слева).
+\end{homework}
+
+\subsection*{Прибавление константы}
+Задача: написать программу для одноленточной МТ в алфавите $\{0, 1, \#\}$, которая к двоичному числу, записанному слева направо
+без лидирующих нулей, прибавляет тройку. Обобщить на константу $k$.
+
+\begin{homework}
+Написать программу для одноленточной МТ в алфавите $\{0, 1, ..., m - 1, \#\}$, которая к $m$-ричному числу, 
+записанному слева направо без лидирующих нулей, прибавляет константу $k$.
+\end{homework}
+
+\begin{homework}
+Перевести двоичное число $x$ в $16$-ричную систему счисления. $\Sigma = \{0, 1, ..., 9, A, B, C, D, E, F, \#\}$
+\end{homework}
+
+\subsection*{Дополнительный блок: строковые алгоритмы}
+Задача: написать программу для одноленточной МТ в алфавите $\{a, b, \#\}$, которая распознает язык $L = \{a^nb^n \ | n \geq 0\}$.
+
+Оценить сложность в худшем. Ускорить программу в $k$ раз (асимптотически), увеличив число состояний, но не изменяя алфавит.
+
+\begin{homework}
+Задача: написать программу для одноленточной МТ в алфавите $\{a, b, \#\}$, которая проверяет,
+есть ли во входной строке подстрока $abaababa$ (\textit{шаблон}). Предложить процедуру построения 
+оптимальной программы поиска для любого заранее известного шаблона.
+\end{homework}
+
+\begin{homework}
+Задача: написать программу для одноленточной МТ в алфавите $\{a, b, \#\}$, которая проверяет,
+есть ли в строке $ababababbbbaaaababaabaabbba$ (\textit{база данных}) подстрока, записанная на входной ленте. 
+Предложить процедуру построения оптимальной программы для любой заранее известной БД.
+\end{homework}
+
+\newpage
+\section*{Семинар \#2. Многоленточная МТ.}
+
+\subsection*{Пример работы}
+
+Задача: инвертировать обе ленты 2-ленточной MT в алфавите $\Sigma = \{0, 1, \#\}$.
+
+Краткая запись программы: $X, Y \in \{0, 1, \#\}$, $x, y \in \{0, 1\}$.
+
+\begin{align*}
+START: &          & & & &                              \\
+       & \MTRuleTwo{\#}{\#}{\#}{R}{\#}{R}{LOOP} \\
+       & \MTRuleTwo{X}{Y}{X}{H}{Y}{H}{ERROR}    \\
+LOOP:  &          & & & &                              \\
+       & \MTRuleTwo{x}{y}{[(x+1)\ mod\ 2]}{R}{[(y + 1)\ mod\ 2]}{R}{LOOP}    \\
+       & \MTRuleTwo{x}{\#}{[(x+1)\ mod\ 2]}{R}{\#}{H}{LOOP}    \\
+       & \MTRuleTwo{\#}{y}{\#}{H}{[(y + 1)\ mod\ 2]}{R}{LOOP}    \\
+       & \MTRuleTwo{\#}{\#}{\#}{H}{\#}{H}{STOP}    \\       
+\end{align*}
+
+\subsection*{Сложение}
+Задача: написать программу для 3-ленточной МТ в алфавите $\{0, 1, \#\}$, которая 
+складывает двоичные числа (LSB слева), записанные на первой и второй ленте, а результат записывает на третью ленту.
+
+Оценить сложность в худшем.
+
+\begin{homework}
+Решить аналогичную задачу для 2-ленточной МТ. Ответ записать на вторую ленту.
+\end{homework}
+
+\subsection*{Умножение}
+
+Задача: написать программу для 3-ленточной МТ в алфавите $\{0, 1, \#\}$, которая 
+умножает двоичные числа, записанные на первой и второй ленте, а результат записывает на третью ленту.
+
+Оценить, как зависит сложность алгоритма от:
+\begin{itemize}
+ \item Формата записи числа (LSB слева vs. LSB справа);
+ \item Порядка записи чисел (большее число на первой ленте vs. на второй ленте);
+ \item Выбранного алгоритма (столбиком vs. крестьянский способ умножения).
+\end{itemize}
+
+\begin{homework}
+Написать программу для МТ и проверить ее в эмуляторе.
+\end{homework}
+
+\newpage
+\section*{Семинары \#3-4. Моделирование}
+\begin{definition}
+ Модель вычислений. Вычислитель. Допустимые входы.
+\end{definition}
+
+\begin{definition}
+ Модель вычислений $M_1$ можно моделировать моделью вычислений $M_2$, если для любой машины $A$ в $M_1$ можно построить машину 
+ $B$ в $M_2$ такую, что: 
+ $$\phi_A = \phi_B \text{ при подходящих интерпретациях,}$$
+ $$T_B(n) = O(p(T_A(n))) \text{ для некоторого полинома p.} $$
+\end{definition}
+
+\begin{definition}
+ Неотрицательные функции $f_1(n)$, $f_2(n)$ \textbf{полиномиально связаны} тогда и только тогда, когда 
+ $\exists p_1(n), p_2(n)$ -- полиномы, такие что:
+ $$\forall n\ f_1(n) \leq p_1(f_2(n)) \text{ и } f_2(n) \leq p_2(f_1(n))$$
+\end{definition}
+
+\begin{definition}
+ Как решать задачи на моделирование:
+ \begin{itemize}
+  \item Зафиксировать модель вычислений $M_1$ в языке $\Sigma_1$,
+  модель вычислений $M_2$ в языке $\Sigma_2$.
+  \item Указать функцию $code: \Sigma_{1}^{*} \rightarrow \Sigma_{2}^{*}$. Проанализировать сложность.
+  \item Указать функцию $decode: \Sigma_{2}^{*} \rightarrow \Sigma_{1}^{*}$. Проанализировать сложность.
+  \item Указать алгоритм, который по вычислителю $A \in M_1$ построит вычислитель $B \in M_2$.
+  \item Обосновать $\phi_A = \phi_B$. При пошаговом моделировании удобно строить индуктивное доказательство. 
+        Важно: не забыть о граничных случаях -- аварийное завершение работы и зацикливание вычислителя.
+  \item Сравнить $T_A(n)$ и $T_B(n)$, $|A|$ и $|B|$.
+ \end{itemize}
+\end{definition}
+
+\subsection*{Моделирование б\textit{о}льшего алфавита}
+Задача: промоделировать 1-ленточную МТ с алфавитом $\Sigma_1 = \{0, 1, \#\}$, на 1-ленточной МТ с алфавитом $\Sigma_2 = \{0, 1\}$.
+Рассматриваются МТ с лентой, бесконечной вправо.
+
+Идея решения: заменить букву из $\Sigma_1$ на пару букв из $\Sigma_2$.
+
+\begin{itemize}
+ \item Определим функцию кодирования $code$:
+ $$w = a_1...a_n \rightarrow b_1^0b_1^1...b_n^0b_n^1$$
+ где $a_i \in \Sigma_1$ переходит в $b_i^0b_i^1, b_i^j\in \Sigma_2$ согласно правилу 
+ $$\# \rightarrow 00, 0 \rightarrow 01, 1 \rightarrow 11$$
+ 
+ \item Определим функцию декодирования как функцию, обратную $code$, полагая, что $10$ переходит в символ $0$. 
+ 
+ \begin{homework}
+ Доказать, что  функцию декодирования можно доопределить произвольным образом. 
+ \end{homework} 
+ 
+ \item Зафиксируем МТ $A = \langle \Sigma_1, Q^A, q_0^A, Q_F^A, \pi\rangle$. Пусть
+  $$q: \MTRule{x}{y}{R}{q'}\ \text{где } q, q' \in Q^A, x, y \in \Sigma_1$$  
+  $$code(x) = x_1x_0, code(y) = y_1y_0,\ \text{где } x_1, x_0, y_1, y_0 \in \Sigma_2$$
+  В таком случае МТ $B = \langle \Sigma_2, Q^B, q_0^B, Q_F^B, \pi\rangle$ должна содержать следующие команды:
+  $$ q               : \MTRule{x_1}{x_1}{R}{q^{x_1\hat{?}}} $$
+  $$ q^{x_1\hat{?}}  : \MTRule{x_0}{y_0}{L}{q^{\hat{x_1}y_0}} $$
+  $$ q^{\hat{x_1}y_0}: \MTRule{x_1}{y_1}{R}{q^{y_1\hat{y_0}}} $$
+  $$ q^{y_1\hat{y_0}}: \MTRule{y_0}{y_0}{R}{q'} $$
+  
+  \begin{homework}
+  Указать, как трансформируются команды
+  $$q: \MTRule{x}{y}{L}{q'}$$
+  $$q: \MTRule{x}{y}{H}{q'}$$   
+  \end{homework}
+ 
+  \item Предположим, что на ленте МТ $A$ записано слово $w$, текущее состояние $q$, указатель находится на позиции $k$ и 
+  будет выполнена команда перехода $t$, изменяющая слово на $w'$, сдвигающая указатель на позицию $k'$ и переводящая МТ в состояние $q'$.
+  Предположим, что МТ $B$ была получена из $A$ по алгоритму, указанному выше. Пусть на ленте $B$ записано слово $v = code(w)$,
+  текущее состояние $q$, указатель находится на позиции $n = 2 * k$ и будут выполнены команды
+  перехода $t_1, t_2, t_3, t_4$, изменяющие слово на $v'$, сдвигающие указатель на позицию $n'$ и переводящие МТ в состояние $\hat{q}$.
+
+  \begin{homework}
+    Доказать, что $decode(v') = w', n' = 2 * k', \hat{q} = q'$. Рассмотреть случай $k' = -1$.
+  \end{homework}
+ 
+ \begin{homework}
+    Доказать, что $\phi_A = \phi_B$. Рассмотреть случай зацикливания $A$.
+  \end{homework}
+   
+  \item По построению 
+  $$T_B(w) \leq 4 T_A(w)$$
+  $$|Q_B| \leq 4 |Q_A| $$
+\end{itemize}
+
+\begin{homework}
+Решить обратную задачу: промоделировать 1-ленточную МТ с алфавитом $\Sigma_1 = \{0, 1\}$, на 1-ленточной МТ с алфавитом $\Sigma_2 = \{0, 1, 2, \#\}$.
+Можно ли ускорить произвольную программу?
+\end{homework}
+
+\subsection*{Задачи для моделирования}
+\begin{itemize}
+ \item Однонапраленная vs. двунаправленная лента.
+ \item 1 лента vs. $k$ лент.
+ \item $\Sigma_1$ vs. $\Sigma_2$ для $|\Sigma_1| = n, |\Sigma_2| = m, n > m$.
+ \item Один указатель на текущий символ vs. $k$ указателей. 
+\end{itemize}
+
+\newpage
+\section*{Семинар \#5. Конечные автоматы.}
+
+\begin{definition}
+Детерминированный конечный автомат (Deterministic Finite State Machine) / Недетерминированный конечный автомат (Nondeterministic Finite Automaton) -- 
+$(X, Q, q_0, Q_F, \pi)$:
+\begin{itemize}
+ \item $X = \{a_1, ..., a_n\}$ -- конечный алфавит,
+ \item $Q$ –  конечное множество состояний,
+ \item $q_0\in Q$ – начальное состояние,
+ \item $Q_F \in Q$ – множество заключительных состояний, 
+ \item $\pi : Q \times X \rightarrow Q$ / $\pi : Q \times X \rightarrow 2^Q$ -- функция перехода.
+\end{itemize}
+\end{definition}
+
+\begin{definition}
+Регулярное выражение над $X=\{a_1, ... ,a_k\}$:
+\begin{itemize}
+ \item $\emptyset, \epsilon, a_i$ -- регулярные выражения;
+ \item если $\alpha, \beta$ -- регулярные выражения, то
+ \begin{itemize}
+  \item $\alpha\beta$ -- конкатенация,
+  \item $\alpha|\beta$ -- альтернатива,
+  \item $(\alpha)^*$ -- итерация;
+ \end{itemize}
+ \item других нет.
+\end{itemize}
+\end{definition}
+
+\begin{definition}
+ Основные теоремы:
+ \begin{itemize}
+  \item Любой язык, распознаваемый НКА, может быть распознан некоторым ДКА.
+  \item Любой язык, распознаваемый ДКА, соответствует языку, задаваемому некоторым регулярным выражением.
+  \item Любой язык, задаваемый регулярным выражением, может быть распознан некоторым НКА.
+ \end{itemize}
+\end{definition}
+
+\subsection*{Пример}
+Язык $L = \{\text{слово в алфавите }\Sigma = \{0, 1\},\text{ которое оканчивается на }01\}$.
+
+Регулярное выражение - $(0|1)^*01$.
+
+\begin{figure}[h!!]
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{cc}
+ДКА & НКА            \\
+ \begin{tikzpicture}[-stealth,shorten >=2pt,node distance=3cm,auto] 
+ \node[state, initial] (q1) {};
+ \node[state, right of=q1] (q2) {};
+ \node[state, accepting, right of=q2] (q3) {};
+\draw
+ (q1) edge[loop below] node {1} (q1)
+ (q1) edge node{0} (q2)
+ (q2) edge[loop above] node {0} (q2)
+ (q2) edge node{1} (q3)
+ (q3) edge[bend left, below] node  {1} (q1)
+ (q3) edge[bend right, above] node {0} (q2);
+\end{tikzpicture}
+  &  
+\begin{tikzpicture}[-stealth,shorten >=2pt,node distance=3cm,auto] 
+   \node[state, initial] (A)   {}; 
+   \node[state] (B) [right=of A] {}; 
+   \node[state, accepting] (C) [right=of B] {};    
+    \path[->] 
+    (A) edge [loop above] node {$0, 1$} (A)
+        edge  node {$0$} (B)
+    (B) edge  node  {$1$} (C);
+\end{tikzpicture}  
+  \\
+\end{tabular}
+}
+\end{figure}
+
+\subsection*{Табличный метод проверки на эквивалентность ДКА}
+См. лекции.
+
+\subsection*{Минимизация ДКА методом грубейшего разбиения}
+\AhoUlman
+
+Cтраницы 181 - 187 (пункт 4.13 ``Разбиение'').
+
+\subsection*{Проверка эквивалентности ДКА алгоритмом Объединить-Найти (Union-Find)}
+\AhoUlman
+
+Страницы 165 - 168 (приложение 3 ``Эквивалентность конечных автоматов'').
+
+\subsection*{Автоматы для разбора на семинаре}
+
+\subsubsection*{I}
+\begin{tikzpicture}[-stealth,shorten >=2pt,node distance=3cm,auto] 
+  \tikzstyle{every state}=[fill=none,draw=black,text=black]
+      \node[initial,accepting,state]           (1)              {1};     
+      \node[accepting,state]         (2) [right of=1] {2};     
+      \node[accepting,state]         (3) [below of=1] {3};   
+      \node[state]                   (4) [right of=3] {4};                    
+  \path 
+	  (1) edge node {0} (2)
+	  (1) edge node {1} (3)
+	  
+	  (2) edge [loop above] node {0} (2)
+	  (2) edge [bend right] node {1} (3)
+	  
+	  (3) edge node {1} (4)
+	  (3) edge [bend right] node {0} (2)
+	  
+	  (4) edge [loop right] node {0, 1} (4)
+	  ;	
+\end{tikzpicture}
+
+\subsubsection*{II}
+\begin{tikzpicture}[-stealth,shorten >=2pt,node distance=3cm,auto] 
+  \tikzstyle{every state}=[fill=none,draw=black,text=black]
+      \node[initial,accepting,state] (1)              {1};     
+      \node[accepting,state]         (2) [right of=1] {2};     
+      \node[accepting,state]         (3) [below of=1] {3};
+      \node[accepting,state]         (4) [below of=2] {4};   
+      \node[state]                   (5) [below of=3] {5};         
+      \node[state]                   (6) [below of=4] {6};                    
+  \path 
+	  (1) edge node {0} (2)
+	  (1) edge node {1} (3)
+	  
+	  (2) edge [loop above] node {0} (2)
+	  (2) edge [bend right] node {1} (4)
+	  
+	  (3) edge node {0} (2)
+	  (3) edge node {1} (5)
+	  
+	  (4) edge [bend right] node {0} (2)
+	  (4) edge node {1} (6)
+	  
+	  (5) edge [loop right] node {0, 1} (5)
+	  (6) edge [loop right] node {0, 1} (6)
+	  ;	
+\end{tikzpicture}
+
+\newpage
+\section*{Семинар \#6. RAM машина.}
+
+\begin{figure}[h]
+\begin{tabular}{ccc | ccc}
+Команда & Аргумент & Символьная запись & Команда & Аргумент & Символьная запись\\
+0  &  0     & Halt 0  &                      13 &  13    & Mult 13 \\           
+1  &  1     & Load =1  &                     14 &  14    & Mult *14 \\            
+2  &  2     & Load 2  &                      15 &  15    & Div =15 \\           
+3  &  3     & Load *3  &                     16 &  16    & Div 16 \\            
+4  &  4     & Store 4  &                     17 &  17    & Div *17 \\            
+5  &  5     & Store *5  &                    18 &  18    & Read 18 \\             
+6  &  6     & Add =6  &                      19 &  19    & Read *19 \\           
+7  &  7     & Add 7  &                       20 &  20    & Write =20 \\          
+8  &  8     & Add *8  &                      21 &  21    & Write 21 \\           
+9  &  9     & Sub =9  &                      22 &  22    & Write *22 \\           
+10 &  10    & Sub 10  &                      23 &  23    & Jump  23   \\           
+11 &  11    & Sub *11  &                     24 &  24    & JZero  24   \\            
+12 &  12    & Mult =12  &                    25 &  25    & JGTZ  25                
+\end{tabular}
+\end{figure}
+
+\begin{definition}
+Словарная функция.
+\end{definition}
+
+\begin{definition}
+Равномерный весовой критерий.
+\end{definition}
+
+\begin{definition}
+Логарифмический весовой критерий.
+\end{definition}
+
+\subsection*{Пример программы}
+\begin{verbatim}
+          Read 1                ; R1 = N, R2 = 0, R0 = 0
+          
+LOOP:     Load 2                ; R0 = R2
+          Mult 0                ; R0 = R0 * R0
+          Sub 1                 ; R0 = R0 - R1
+          JZero FINISHED        ; if R0 == 0 goto FINISHED
+          JGTZ FIN_SUB          ; if R0 > 0  goto FIN_SUB
+          Load 2                ; R0 = R2
+          Add =1                ; R0 = R0 + 1
+          Store 2               ; R2 = R0
+          JUMP LOOP             ; goto LOOP
+
+FIN_SUB:  Load 2                
+          Sub =1
+          Store 2               ; R2 = R2 - 1
+
+FINISHED: Load =2               ; R0 = 2
+          Write *0              ; print (R_(R_0)) ~ print(R_2) ~ print(R2)
+          Halt 0                ; stop
+\end{verbatim}
+
+\newpage
+\subsection*{Алгоритм Евклида: пошаговое кодирование}
+
+\newcommand{\TabWidth}{2in}
+\begin{tabular}{lll}
+ Псевдокод & Циклы -> метки & Условия -> метки\\
+ \hline 
+ & & \\
+ \begin{minipage}{1.5in} 
+\begin{verbatim}
+ a <- read()
+ b <- read()
+ 
+ while (a != b) {
+   if (a > b) {
+   
+   
+   
+     a = a - b
+     
+   } else {
+      
+     b = b - a
+     
+   }
+   
+ }
+ 
+  
+ write(a)
+ 
+\end{verbatim}
+\end{minipage}
+&
+\begin{minipage}{\TabWidth} 
+\begin{verbatim}
+ a <- read()
+ b <- read() 
+ LOOP:
+   if (a == b) goto END
+   if (a > b) {
+   
+   
+      
+     a = a - b
+     
+   } else {
+   
+     b = b - a
+     
+   } 
+   goto LOOP
+
+ END:
+  
+   write(a)
+   
+\end{verbatim}
+\end{minipage}
+&
+\begin{minipage}{\TabWidth} 
+\begin{verbatim}
+ a <- read()
+ b <- read() 
+ LOOP:
+   if (a == b) goto END
+   if (a > b) goto SUB_A
+   goto SUB_B
+   
+SUB_A:
+   a = a - b
+   goto AFTER_IF:  
+   
+SUB_B:
+   b = b - a
+   goto AFTER_IF
+   
+AFTER_IF:   
+   goto LOOP
+ 
+END: 
+   write(a)
+   
+\end{verbatim}
+\end{minipage} \\
+\hline
+\end{tabular}
+
+
+
+\noindent \begin{tabular}{lll}
+ Удаление лишних переходов & Распределение регистров & Оптимизация общих выражений \\
+ \hline 
+ & & \\
+\begin{minipage}{1.5in} 
+\begin{verbatim}
+ a <- read()
+ b <- read() 
+ LOOP:
+ 
+   if (a == b) goto END
+   if (a > b) goto SUB_A
+
+   b = b - a
+   
+   goto LOOP
+   
+SUB_A:
+   a = a - b
+   goto LOOP  
+       
+END: 
+   write(a)
+\end{verbatim}
+\end{minipage}
+&
+\begin{minipage}{\TabWidth} 
+\begin{verbatim}
+ R1 <- read()
+ R2 <- read() 
+ LOOP:
+   R0 = R1 - R2
+   if (R0 == 0) goto END
+   if (R0 > 0) goto SUB_A
+
+   R2 = R2 - R1
+   
+   goto LOOP
+   
+SUB_A:
+   R1 = R1 - R2
+   goto LOOP  
+       
+END: 
+   write(R1)
+\end{verbatim}
+\end{minipage}
+&
+\begin{minipage}{\TabWidth} 
+\begin{verbatim}
+ R1 <- read()
+ R2 <- read() 
+ LOOP:
+   R0 = R1 - R2
+   if (R0 == 0) goto END
+   if (R0 > 0) goto SUB_A
+
+   R0 = -R0
+   R2 = R0
+   goto LOOP
+   
+SUB_A:
+   R1 = R0
+   goto LOOP  
+       
+END: 
+   write(R1)
+\end{verbatim}
+\end{minipage}
+\end{tabular}
+
+
+
+\begin{tabular}{lll}
+ RAM ассемблер & Машинный код \\
+ \hline 
+ &  \\
+\begin{minipage}{\TabWidth} 
+\begin{verbatim}
+1.         Read 1
+2.         Read 2
+3. LOOP:   Load 1
+4.         Sub 2
+5.         JZero END
+6.         JGTZ SUB_A
+7.         MULT =-1
+8.         Store 2
+9.         Jump LOOP
+10. SUB_A: Store 1
+11.        Jump LOOP
+12. END:   Write 1
+13.        Halt 0
+\end{verbatim}
+\end{minipage}
+&
+\begin{minipage}{\TabWidth} 
+\begin{verbatim}
+18   1
+18   2            
+2    1      
+10   2      
+24   12     
+25   10     
+12   -1     
+4    2      
+23   3      
+4    1      
+23   3      
+21   1      
+0    0      
+\end{verbatim}
+\end{minipage}
+\end{tabular}
+
+\begin{homework}
+ Провести анализ сложности алгоритма при логарифмическом весовом критерии.
+\end{homework}
+
+\subsection*{Косвенная адресация}
+Задача: написать программу для RAM-машины, которая вычисляет скалярное произведение двух непустых векторов.
+
+Вход: $n \geq 1$, $a_1, ..., a_n, b_1, ..., b_n$
+
+Выход: $\sum_{i=1}^{n} a_i b_i$
+
+Проанализировать сложность программы, используя равномерный и логарифмический весовой критерий.
+
+\subsection*{Реализация стека}
+Задача: написать программу для RAM-машины, которая выводит вектор целых чисел в обратном порядке. Признак конца вектора -- число $0$.
+
+Вход: $a_1, ..., a_n, 0$, где $a_i \neq 0$.
+
+Выход: $a_n, a_{n-1}, ..., a_1$
+
+Использовать псевдопроцедуры $push, pop$.
+
+\newpage
+\section*{Семинар \#7. RAM машина как ассемблер ЯВУ: вызов функций}
+
+\subsection*{Функция высшего порядка map}
+Задача: написать программу для RAM-машины, которая применяет некоторую целочисленную функцию $f$ к массиву чисел.
+
+Вход: $n > 0, a_1, ..., a_n$.
+
+Выход: $f(a_1), ..., f(a_n)$.
+
+\noindent Обобщить на функции от нескольких параметров:
+
+Вход: $n > 0, 0 < k < 5, a_1^1, a_1^2, ..., a_1^k, ..., a_n^1, a_n^2, ..., a_n^k$.
+
+Выход: $f(a_1^1, a_1^2, ..., a_1^k), ..., f(a_n^1, a_n^2, ..., a_n^k)$.
+
+\subsection*{Соглашение о вызовах и адрес возврата}
+Переписать программу из предыдущего пункта, используя следующий контракт:
+\begin{itemize}
+ \item В регистре $R_1$ передается номер инструкции, на которую следует перейти после выполнения $f$ (ret-address).
+ \item В регистрах $R_2, ..., R_5$ передаются параметры для $f$ (param-passing regs). После выполнения $f$ регистры должны содержать то же самое значение (non-volatile regs).
+ \item Регистры $R_6, ..., R_{10}$ после выполнения $f$ могут произвольным образом измениться (volatile regs).
+ \item В регистре $R_0$ должен быть сохранен результат вычисления функции.
+\end{itemize}
+
+Реализовать ``псевдоинструкцию'' $call$.
+
+\begin{homework}
+ Реализовать транслятор ``расширенного'' RAM-ассемблера, использующего инструкцию $call$, в обычный ассемблер.
+ Использовать любой язык программирования. Возможно ли таким образом реализовать рекурсивные вызовы?
+\end{homework}
+
+\subsection*{Дополнительный блок: арифметические выражения}
+\begin{homework}
+ Дана строка в обратной польской записи, в которой встречаются только положительные целые числа и коды операций:
+ $$+ \rightarrow -1$$
+ $$- \rightarrow -2$$
+ $$* \rightarrow -3$$
+ $$/ \rightarrow -4$$
+ 
+ Вычислить данное выражение либо зациклиться, если происходит недопустимая операция (деление на ноль).
+\end{homework}
+
+\begin{homework} 
+ Усложнение предыдущей задачи: в строке встречаются переменные
+ $$x \rightarrow -5$$
+ $$y \rightarrow -6$$
+ $$z \rightarrow -7$$
+ и задана таблица их значений в виде пар $\langle$ код переменной, значение переменной $\rangle$.
+\end{homework}
+
+\newpage
+\section*{Семинары \#8-9. RASP машина. Самомодифицирующийся код. JIT компиляция. Эмуляция косвенности. Загрузчик. Квайн. }
+
+\subsection*{Пример самомодифицирующейся программы}
+\begin{verbatim}
+START: Load  =0
+       Store  9
+       Load  =0
+       Store 10
+       Jump  START
+\end{verbatim}
+
+\subsection*{Переход на произвольную инструкцию}
+\begin{verbatim}
+LABEL: Load x            ; R0 = x
+       Store [LABEL + 5] ; --|
+       JUMP Label        ; <-|  JUMP x
+\end{verbatim}
+
+\begin{homework}
+  Объяснить, как реализовать рекурсивный вызов процедур на RASP машине.
+  Использовать концепцию стекового кадра и стека вызовов\footnote{\url{https://en.wikipedia.org/wiki/Call_stack}}.
+\end{homework}
+
+\begin{homework}
+ Реализовать транслятор ``расширенного'' RASP-ассемблера, использующего инструкцию $call$, в обычный ассемблер.
+ Поддержать рекурсивные вычисления, в том числе косвенную рекурсию. Использовать любой язык программирования. 
+\end{homework}
+
+\subsection*{Генерация программы в памяти во время исполнения}
+Задача: написать \textit{процедуру} для RASP-машины, которая принимает аргументом число $n > 0$ и печатает числа от $1$ до $n$ включительно. 
+
+\begin{homework}
+Оценить алгоритмическую сложность программы при равномерном весовом критерии.
+\begin{verbatim}
+void printer(int n) {
+  i = 0
+LOOP: 
+  write (i)
+  if (n == 0) goto END
+  i = i + 1
+  n = n - 1
+  goto LOOP
+END: 
+  return 
+}   
+\end{verbatim}
+\end{homework}
+
+\subsubsection*{Loop unrolling}
+ Оценить алгоритмическую сложность программ при равномерном весовом критерии.
+
+\begin{tabular}{l|l}
+& \\
+\begin{minipage}{3in} 
+\begin{verbatim}
+void printer_2_naive(int n) {
+  i = 0
+LOOP: 
+  write (i)
+  if (n == 0) goto END
+  i = i + 1
+  n = n - 1
+
+  write (i)
+  if (n == 0) goto END
+  i = i + 1
+  n = n - 1
+
+  goto LOOP
+END: 
+  return 
+}   
+
+
+
+\end{verbatim}
+\end{minipage}
+&
+\begin{minipage}{3in} 
+\begin{verbatim}
+void printer_2_preheader(int n) {
+  i = 0
+
+  mod = n % 2
+  if (mod == 0) goto LOOP  
+  write (i)
+  i = i + 1
+  n = n - 1
+     
+LOOP: 
+  write (i)
+  i = i + 1
+  write (i)
+  i = i + 1  
+  n = n - 2
+  if (n == 0) goto END  
+  goto LOOP
+END: 
+  return 
+}   
+\end{verbatim}
+\end{minipage}
+\end{tabular}
+
+\begin{homework}
+ Напиcать RASP-программу, которая для заданного $k$ генерирует программу $printer\_k\_preheader$.
+ Оценить сложность программы генерации и сложность сгенерированной программы.
+\end{homework}
+
+\begin{homework}
+ Проанализировать эффективность оптимизации ``Раскрутка цикла'' -- найти формулы для оценки сложности при равномерном весовом критерии
+ и для затрат памяти. Какие стратегии раскрутки кажутся Вам наиболее эффективными? Привести контрпримеры.
+ Можно ли использовать информацию времени выполнения (a.k.a. execution profile), чтобы принять оптимальное решение?
+\end{homework}
+
+\subsection*{Загрузчик программ. Отличие от интерпретатора.}
+Задача: написать RASP-программу, которая считывает с входной ленты поток чисел длины $N$, являющийся допустимой RASP-программой,
+располагает ``входную программу'' в регистрах $R_1, R_2, ..., R_N$, а затем передает ей управление, выполнив $JUMP$ на регистр $R_1$.
+
+\subsection*{Вопросы для самостоятельного разбора.}
+Итоговая контрольная работа содержит задачи на материал данного раздела.
+
+\subsubsection*{Пример RASP программы, выводящей свой собственный код.}
+\url{https://en.wikipedia.org/wiki/Quine_(computing)}
+
+\subsubsection*{Эмуляция косвенности (операций со звездочкой).}
+\AhoUlman
+
+Cтраницы 26 - 31 (пункт 1.4 ``Модель с хранимой программой'').
+\end{document}
