@@ -1,2 +1,6 @@
-# theory-of-programming-notes
-Notes for "Theory of programming" course in Novosibirsk State University
+# Материалы к семинарам по курсу "Теория программирования" (НГУ, ММФ, 4 курс)
+
+- `pdfs` -- последние pdf версии метариалов
+- `notes` -- конспекты семинаров
+- `problems` -- тексты задач для самостоятельного решения
+- `themes` -- темы докладов
